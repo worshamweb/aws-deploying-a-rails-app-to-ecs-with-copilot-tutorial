@@ -1,0 +1,61 @@
+# The manifest for the "web" service.
+# Read the full specification for the "Load Balanced Web Service" type at:
+# https://aws.github.io/copilot-cli/docs/manifest/lb-web-service/
+
+# Your service name will be used in naming your resources like log groups, ECS services, etc.
+name: web
+type: Load Balanced Web Service
+
+# Distribute traffic to your service.
+http:
+  # Requests to this path will be forwarded to your service.
+  # To match all requests you can use the "/" path.
+  path: '/'
+  # You can specify a custom health check path. The default is "/".
+  healthcheck: '/up'
+
+# Configuration for your containers and service.
+image:
+  # Docker build arguments. For additional overrides: https://aws.github.io/copilot-cli/docs/manifest/lb-web-service/#image-build
+  build: './Dockerfile'
+
+# Optional fields for more advanced use-cases.
+#
+secrets:
+  # The secrets to expose to your service as environment variables.
+  - RAILS_MASTER_KEY
+  # - DB_PASSWORD
+
+variables:
+  # The environment variables to expose to your service.
+  RAILS_ENV: production
+  RAILS_LOG_TO_STDOUT: true
+  RAILS_SERVE_STATIC_FILES: true
+
+# You can override any of the values defined above by environment.
+# environments:
+#   test:
+#     variables:
+#       LOG_LEVEL: debug
+
+# Number of tasks that should be running in your service.
+count:
+  min: 1
+  max: 10
+  cooldown:
+    scale_in_cooldown: 300s
+    scale_out_cooldown: 300s
+  target_cpu: 70
+  target_memory: 80
+
+# Enable running commands in your container.
+exec: true
+
+# Enable logging
+logging:
+  enable_metadata: true
+
+network:
+  vpc:
+    enable_logs: true
+    placement: 'public'
