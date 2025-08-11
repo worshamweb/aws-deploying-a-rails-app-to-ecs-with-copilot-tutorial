@@ -146,7 +146,7 @@ aws cloudwatch put-metric-alarm \
   --threshold 10 \
   --comparison-operator GreaterThanThreshold \
   --dimensions Name=Currency,Value=USD \
-  --alarm-actions arn:aws:sns:us-east-1:ACCOUNT-ID:billing-alarm
+  --alarm-actions arn:aws:sns:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:billing-alarm
 ```
 
 #### AWS Console Method
@@ -270,7 +270,7 @@ read -p "Number of tasks (containers): " tasks
 read -p "CPU units (256, 512, 1024): " cpu
 read -p "Memory MB (512, 1024, 2048): " memory
 
-# Fargate pricing (us-east-1)
+# Fargate pricing (YOUR_AWS_REGION)
 cpu_cost_per_hour=0.04048
 memory_cost_per_gb_hour=0.004445
 alb_cost_per_hour=0.0225

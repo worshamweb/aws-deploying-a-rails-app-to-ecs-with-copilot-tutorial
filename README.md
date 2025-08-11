@@ -1,8 +1,8 @@
-# Rails Weather App - AWS ECS Deployment Tutorial
+# AWS Copilot Tutorial: Deploying Serverless Containers to ECS Fargate
 
 ## 🌤️ Application Overview
 
-This tutorial uses a pre-existing Rails 8.0 weather application (originally from [github.com/worshamweb/weather](https://github.com/worshamweb/weather)) to demonstrate cloud deployment using AWS ECS with Copilot. 
+This tutorial uses a pre-existing Rails 8.0 weather application (originally from [github.com/worshamweb/weather](https://github.com/worshamweb/weather)) to demonstrate serverless container deployment using AWS ECS Fargate with Copilot. 
 
 **Focus**: This tutorial is about **deploying an existing Rails application**, not building one. For details about the weather app's features and functionality, see the [original repository's README](https://github.com/worshamweb/weather).
 
@@ -102,7 +102,7 @@ aws sts get-caller-identity --query Account --output text
 # Should show your AWS account ID (12-digit number)
 ```
 
-**⚠️ Important**: Note your AWS region and account ID - you'll reference these during deployment!
+**⚠️ Important**: Note your AWS region and account ID - you'll reference these during deployment as YOUR_AWS_REGION and YOUR_AWS_ACCOUNT_ID!
 
 #### 4. Verify Ruby Installation
 ```bash
@@ -165,15 +165,16 @@ config.cache_store = :solid_cache_store
 ./bin/rails db:setup:cache
 ```
 
-## ☁️ AWS Deployment Features
+## ☁️ AWS Fargate Deployment Features
 
+- **Serverless containers** using AWS Fargate (no server management required)
 - **Container-based deployment** using Docker and Amazon ECS
 - **Load balancing** with Application Load Balancer
 - **Auto-scaling** based on CPU and memory usage
 - **Health monitoring** with built-in health checks
 - **Centralized logging** with CloudWatch
 - **Secret management** for API keys and credentials
-- **Cost-optimized** configuration using AWS free tier resources
+- **Infrastructure as Code** with AWS Copilot (simplified CloudFormation)
 
 ## 💰 Cost Considerations
 
@@ -184,15 +185,17 @@ config.cache_store = :solid_cache_store
 - **CloudWatch Logs**: First 5 GB per month free (always free)
 - **Data Transfer**: Minimal for testing, but monitor usage
 
-### Potential Costs
+### Fargate Costs (Not Free Tier)
 - **ECS Fargate**: ~$0.04048 per vCPU per hour, ~$0.004445 per GB memory per hour
-- **Application Load Balancer**: ~$0.0225 per hour after free tier
-- **Data Transfer**: Minimal for testing, but monitor usage
+- **Tutorial configuration**: 0.25 vCPU + 512MB = ~$0.012/hour (~$9/month if left running)
+- **Application Load Balancer**: 750 hours per month free (first 12 months)
+- **Amazon ECR**: 500 MB storage per month free
 - **CloudWatch Logs**: First 5 GB per month free
+- **Data Transfer**: Minimal for testing
 
-> **⚠️ Important**: While this tutorial uses free tier resources where possible, some charges may apply. Always monitor your AWS billing dashboard and set up billing alerts.
+> **⚠️ Important**: This tutorial uses AWS Fargate, which is **not covered by the free tier**. However, costs are predictable and low (~$9/month for the small container we deploy).
 >
-> **For beginners**: Don't worry about costs during this tutorial. We've designed it to stay within free tier limits, and we'll show you how to clean up everything at the end.
+> **For learning**: Complete the tutorial, test your deployment, then clean up resources immediately to minimize costs. We'll show you exactly how to delete everything at the end.
 
 For detailed cost management strategies, see [COST_OPTIMIZATION.md](COST_OPTIMIZATION.md).
 

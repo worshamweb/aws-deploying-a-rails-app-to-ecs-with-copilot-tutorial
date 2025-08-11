@@ -132,7 +132,7 @@ rails credentials:edit
 aws sts get-caller-identity
 
 # Try different region
-copilot env init --name test --region us-west-2
+copilot env init --name test --region YOUR_AWS_REGION
 
 # Check service quotas in AWS Console
 ```

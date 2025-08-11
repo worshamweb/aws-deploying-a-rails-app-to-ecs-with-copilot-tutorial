@@ -35,7 +35,7 @@ Use this checklist to ensure a smooth deployment of your Rails weather applicati
 - [ ] AWS account has appropriate permissions
 - [ ] Billing alerts configured (recommended: $10 threshold)
 - [ ] Free tier usage monitored
-- [ ] Region selected (recommend: us-east-1 for free tier)
+- [ ] Region selected (recommend: YOUR_AWS_REGION for free tier)
 
 ## 🚀 Deployment Steps
 
@@ -86,7 +86,7 @@ Use this checklist to ensure a smooth deployment of your Rails weather applicati
 - [ ] Run `copilot svc show --name web --env test`
   - Look for the URL in the "Routes" section
 - [ ] Copy the application URL
-  - It will look like: https://weather-app-test-xxxxx.us-east-1.elb.amazonaws.com
+  - It will look like: https://weather-app-test-xxxxx.YOUR_AWS_REGION.elb.amazonaws.com
 - [ ] Test application in browser
   - Paste the URL and visit it - you should see the weather app!
 - [ ] Verify health check endpoint works
