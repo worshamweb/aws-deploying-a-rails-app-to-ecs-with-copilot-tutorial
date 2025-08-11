@@ -1,6 +1,6 @@
-# Deploying a Rails Application to Amazon ECS with AWS Copilot
+# AWS Copilot Tutorial: Deploying Serverless Containers to ECS Fargate
 
-This tutorial will guide you through deploying a Rails weather application to Amazon ECS (Elastic Container Service) using AWS Copilot. The application provides weather forecasts using Google Places autocomplete and WeatherAPI.com integration.
+This tutorial will guide you through deploying a Rails weather application to Amazon ECS Fargate using AWS Copilot. You'll learn how to deploy serverless containers without managing servers - AWS handles all the infrastructure automatically. The application provides weather forecasts using Google Places autocomplete and WeatherAPI.com integration.
 
 ## 🔰 First Time User? Start Here!
 
@@ -13,15 +13,17 @@ This tutorial will guide you through deploying a Rails weather application to Am
 - Basic command line familiarity (we'll guide you through each command)
 
 **What you'll learn**:
-- How to deploy applications to the cloud
-- AWS fundamentals (containers, load balancers, auto-scaling)
-- Modern DevOps practices
-- Cost management in the cloud
+- How to deploy serverless containers to AWS Fargate
+- AWS Copilot fundamentals (the easiest way to use ECS)
+- Container orchestration without server management
+- Modern DevOps practices with Infrastructure as Code
+- Cost management for serverless containers
 
 **Don't worry about**:
 - Breaking anything (we use safe, isolated resources)
-- Costs (tutorial designed for AWS free tier)
+- Server management (Fargate is serverless - AWS handles everything)
 - Complex configurations (Copilot handles the complexity)
+- High costs (small Fargate containers cost ~$9/month, easily cleaned up)
 
 💡 **Pro tip**: Make sure you've completed all the prerequisite verification steps in the [README](README.md) before starting this deployment tutorial.
 
@@ -62,22 +64,25 @@ docker run -p 3000:80 weather-app
 
 ```bash
 # Create a private container registry for your application
-aws ecr create-repository --repository-name rails-weather-app-ecs-tutorial --region us-east-1
+# Replace YOUR_AWS_REGION with your actual AWS region (e.g., us-east-1)
+aws ecr create-repository --repository-name rails-weather-app-ecs-tutorial --region YOUR_AWS_REGION
 ```
 
 **Expected output**:
 ```json
 {
     "repository": {
-        "repositoryArn": "arn:aws:ecr:us-east-1:123456789012:repository/rails-weather-app-ecs-tutorial",
-        "registryId": "123456789012",
+        "repositoryArn": "arn:aws:ecr:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:repository/rails-weather-app-ecs-tutorial",
+        "registryId": "YOUR_AWS_ACCOUNT_ID",
         "repositoryName": "rails-weather-app-ecs-tutorial",
-        "repositoryUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/rails-weather-app-ecs-tutorial"
+        "repositoryUri": "YOUR_AWS_ACCOUNT_ID.dkr.ecr.YOUR_AWS_REGION.amazonaws.com/rails-weather-app-ecs-tutorial"
     }
 }
 ```
 
 **What's happening**: We're creating a private container registry in Amazon ECR (Elastic Container Registry) where AWS will store your application's Docker images. This is more secure and better integrated with AWS services than using public registries like Docker Hub.
+
+💰 **Cost Note**: Creating ECR repositories is free, and storing small Docker images (like our Rails app) falls within the 500 MB free tier. You don't need to worry about deleting this repository immediately after the tutorial. However, you might want to delete it before creating another repository in the future to stay within the free tier storage limit.
 
 ### Step 3: Initialize AWS Copilot
 
@@ -88,7 +93,14 @@ copilot app init weather-app
 
 **Expected output**:
 ```
-✔ Created the infrastructure to manage services and jobs under application weather-app.
+✔ Proposing infrastructure changes for stack weather-app-infrastructure-roles
+- Creating the infrastructure for stack weather-app-infrastructure-roles                        [create complete]  [49.1s]
+  - A StackSet admin role assumed by CloudFormation to manage regional stacks                   [create complete]  [17.7s]
+  - An IAM role assumed by the admin role to create ECR repositories, KMS keys, and S3 buckets  [create complete]  [24.4s]
+✔ The directory copilot will hold service manifests for application weather-app.
+
+Recommended follow-up action:
+  - Run `copilot init` to add a new service or job to your application.
 ```
 
 **What's happening**: Copilot creates a new "application" in AWS. Think of this as a container for all the resources your app needs. You'll see a new `copilot/` directory created with configuration files.
@@ -100,56 +112,81 @@ copilot app init weather-app
 copilot svc init --name web --svc-type "Load Balanced Web Service"
 ```
 
+**What you'll see**: Copilot will prompt you to choose a Dockerfile:
+```
+Note: It's best to run this command in the root of your workspace.
+
+  Which Dockerfile would you like to use for web?  [Use arrows to move, type to filter, ? for more help]
+  > ./Dockerfile
+    Enter custom path for your Dockerfile
+    Use an existing image instead
+```
+
+**What to do**: Select the first option `./Dockerfile` (it should be highlighted by default) and press Enter.
+
 **Expected output**:
 ```
-✔ Wrote the manifest for service web at copilot/web/copilot.yml
+✔ Wrote the manifest for service web at copilot/web/manifest.yml
+Your manifest contains configurations like your container size and port.
+
+- Update regional resources with stack set "weather-app-infrastructure"  [succeeded]  [0.0s]
+Recommended follow-up actions:
+  - Update your manifest copilot/web/manifest.yml to change the defaults.
+  - Run `copilot svc deploy --name web --env test` to deploy your service to a test environment.
 ```
 
 **What's happening**: This creates a "service" configuration. A service is a running application that can handle web traffic. The "Load Balanced" type means AWS will automatically distribute incoming requests across multiple copies of your app for reliability.
 
 This command creates:
-- `copilot/web/copilot.yml` - Configuration file for your service
+- `copilot/web/manifest.yml` - Configuration file for your service
 - Load balancer setup for handling web traffic
 - Health check configuration to monitor your app
 
 ### Step 5: Configure the Service
 
-The generated `copilot/web/copilot.yml` will need some adjustments for our Rails application:
+The generated `copilot/web/manifest.yml` will need some adjustments for our Rails application. Open the file and update it with these changes:
 
 ```yaml
-# copilot/web/copilot.yml
+# copilot/web/manifest.yml
 name: web
 type: Load Balanced Web Service
 
+# Distribute traffic to your service
 http:
+  path: '/'
+  # Rails health check endpoint (change from default "/" to "/up")
   healthcheck: '/up'
 
+# Configuration for your containers and service
 image:
-  build: './Dockerfile'
+  build: Dockerfile
+  port: 80  # Rails app runs on port 80 inside container
 
-secrets:
-  - RAILS_MASTER_KEY
-
-variables:
-  RAILS_ENV: production
-
-count:
-  min: 1
-  max: 10
-  cooldown:
-    scale_in_cooldown: 300s
-    scale_out_cooldown: 300s
-  target_cpu: 70
-  target_memory: 80
+# Resource allocation
+cpu: 256       # Number of CPU units for the task
+memory: 512    # Amount of memory in MiB used by the task
+count: 1       # Number of tasks that should be running
+exec: true     # Enable running commands in your container
 
 network:
-  vpc:
-    enable_logs: true
+  connect: true # Enable Service Connect for intra-environment traffic
 
-exec: true
-logging:
-  enable_metadata: true
+# Environment variables for Rails
+variables:
+  RAILS_ENV: production
+  RAILS_LOG_TO_STDOUT: true
+  RAILS_SERVE_STATIC_FILES: true
 ```
+
+**Key changes made**:
+- **Health check**: Changed from `/` to `/up` (Rails 8's built-in health check endpoint)
+- **Environment variables**: Added Rails production settings
+- **Port**: Explicitly set to 80 to match our Dockerfile configuration
+
+⚠️ **Cost Warning**: This configuration uses AWS Fargate, which is **not covered by the free tier**. With these settings (0.25 vCPU, 512 MiB memory), expect costs of approximately **$0.012/hour or ~$9/month** if running continuously. For learning purposes, consider:
+- Running the tutorial and then cleaning up resources immediately
+- Only running during testing periods
+- See [COST_OPTIMIZATION.md](COST_OPTIMIZATION.md) for cost management strategies
 
 ### Step 6: Create an Environment
 
@@ -158,9 +195,48 @@ logging:
 copilot env init --name test
 ```
 
+**What you'll see**: Copilot will prompt you to choose credentials:
+```
+  Which credentials would you like to use to create test?  [Use arrows to move, type to filter, ? for more help]
+  > Enter temporary credentials
+    [profile default]
+```
+
+**What to do**: Use the down arrow key to select `[profile default]` (the second option) since you've already configured your AWS CLI credentials, then press Enter.
+
+**Next, you'll see**: Copilot will ask about environment configuration:
+```
+ Would you like to use the default configuration for a new environment?
+    - A new VPC with 2 AZs, 2 public subnets and 2 private subnets
+    - A new ECS Cluster
+    - New IAM Roles to manage services and jobs in your environment
+  [Use arrows to move, type to filter]
+  > Yes, use default.
+    Yes, but I'd like configure the default resources (CIDR ranges, AZs).
+    No, I'd like to import existing resources (VPC, subnets).
+```
+
+**What to do**: Select `Yes, use default.` (the first option, already highlighted) and press Enter. This creates a complete, isolated environment for your application.
+
+💡 **Want to learn more?** If you're curious about VPC networking, CIDR ranges, and subnets, check out the [AWS VPC User Guide](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html) to understand how AWS networking works.
+
 **Expected output**:
 ```
-✔ Wrote the manifest for environment test at copilot/environments/test/copilot.yml
+✔ Wrote the manifest for environment test at copilot/environments/test/manifest.yml
+- Update regional resources with stack set "weather-app-infrastructure"  [succeeded]  [0.0s]
+- Update regional resources with stack set "weather-app-infrastructure"  [succeeded]           [41.3s]
+  - Update resources in region "us-east-1"                               [create complete]     [40.4s]
+    - ECR container image repository for "web"                           [create complete]     [2.1s]
+    - KMS key to encrypt pipeline artifacts between stages               [create complete]     [16.8s]
+    - S3 Bucket to store local artifacts                                 [create in progress]  [4.6s]
+✔ Proposing infrastructure changes for the weather-app-test environment.
+- Creating the infrastructure for the weather-app-test environment.  [create complete]  [42.5s]
+  - An IAM Role for AWS CloudFormation to manage resources           [create complete]  [20.9s]
+  - An IAM Role to describe resources in your environment            [create complete]  [19.4s]
+✔ Provisioned bootstrap resources for environment test in region us-east-1 under application weather-app.
+Recommended follow-up actions:
+  - Update your manifest copilot/environments/test/manifest.yml to change the defaults.
+  - Run `copilot env deploy --name test` to deploy your environment.
 ```
 
 ```bash
@@ -170,7 +246,7 @@ copilot env deploy --name test
 
 **What's happening**: An "environment" is like a complete copy of your infrastructure (networking, security, load balancers). You might have separate environments for testing, staging, and production.
 
-**⏱️ Time expectation**: This step takes 10-15 minutes because AWS is creating:
+**⏱️ Time expectation**: This step takes ~5 minutes because AWS is creating:
 - Virtual Private Cloud (VPC) - your private network
 - Subnets - network segments for security
 - Internet Gateway - connection to the internet
@@ -180,12 +256,18 @@ copilot env deploy --name test
 **Expected output** (this will stream for several minutes):
 ```
 ✔ Proposing infrastructure changes for the weather-app-test environment.
-- Creating the infrastructure for the weather-app-test environment.
-  - An Internet Gateway to connect to the public internet.
-  - Public subnets for internet facing services.
-  - A security group to allow your containers to talk to each other.
-  - A load balancer to distribute traffic to your services.
-  - An ECS cluster to group your services.
+- Creating the infrastructure for the weather-app-test environment.                    [update complete]  [67.6s]
+  - An ECS cluster to group your services                                              [create complete]  [9.1s]
+  - A security group to allow your containers to talk to each other                    [create complete]  [7.4s]
+  - An Internet Gateway to connect to the public internet                              [create complete]  [15.8s]
+  - A resource policy to allow AWS services to create log streams for your workloads.  [create complete]  [0.0s]
+  - Private subnet 1 for resources with no internet access                             [create complete]  [3.0s]
+  - Private subnet 2 for resources with no internet access                             [create complete]  [3.0s]
+  - A custom route table that directs network traffic for the public subnets           [create complete]  [11.1s]
+  - Public subnet 1 for resources that can access the internet                         [create complete]  [3.0s]
+  - Public subnet 2 for resources that can access the internet                         [create complete]  [3.0s]
+  - A private DNS namespace for discovering services within the environment            [create complete]  [43.9s]
+  - A Virtual Private Cloud to control networking of your AWS resources                [create complete]  [12.8s]
 ```
 
 ### Step 7: Set Up Secrets
@@ -203,7 +285,12 @@ copilot secret init --name RAILS_MASTER_KEY
 
 **Expected output**:
 ```
-✔ Successfully created secret RAILS_MASTER_KEY in environment test.
+✔ Successfully put secret RAILS_MASTER_KEY in environment test as /copilot/weather-app/test/secrets/RAILS_MASTER_KEY.
+You can refer to these secrets from your manifest file by editing the `secrets` section.
+```
+secrets:                                                                                                                                                                                                                            
+    RAILS_MASTER_KEY: /copilot/\${COPILOT_APPLICATION_NAME}/\${COPILOT_ENVIRONMENT_NAME}/secrets/RAILS_MASTER_KEY                                                                                                                     
+```
 ```
 
 **What's happening**: Rails uses this master key to decrypt sensitive configuration data. We're storing it securely in AWS Secrets Manager so your application can access it without exposing it in your code.
@@ -215,7 +302,9 @@ copilot secret init --name RAILS_MASTER_KEY
 copilot svc deploy --name web --env test
 ```
 
-**⏱️ Time expectation**: 5-10 minutes
+⚠️ **Docker Credentials Warning**: You may see a warning about "credentials stored unencrypted in ~/.docker/config.json". This is safe to ignore for this tutorial - these are temporary ECR tokens that expire automatically. In production environments, you should configure a Docker credential helper for better security.
+
+**⏱️ Time expectation**: 15-20 minutes (especially on first deployment)
 
 **What's happening** (you'll see progress for each step):
 1. **Building Docker image** - Copilot builds your Rails app into a container
@@ -233,7 +322,7 @@ copilot svc deploy --name web --env test
   - An ECS service to run and maintain your tasks in the environment cluster.
   - A target group to connect the load balancer to your service.
   - A security group to allow your containers to talk to each other.
-✔ Created environment test in region us-east-1.
+✔ Created environment test in region YOUR_AWS_REGION.
 ✔ Deployed service web.
 ```
 
@@ -257,7 +346,7 @@ Configurations
 Routes
   Environment   URL
   -----------   ---
-  test          https://weather-app-test-123456789.us-east-1.elb.amazonaws.com
+  test          https://weather-app-test-YOUR_AWS_ACCOUNT_ID.YOUR_AWS_REGION.elb.amazonaws.com
 
 Variables
   Name        Environment   Value
